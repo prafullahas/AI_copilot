@@ -15,6 +15,7 @@ Create a clean backend project using Node.js (Express) for an AI codebase copilo
 - GET /api/health endpoint returning status, uptime, timestamp
 - CORS middleware, 404 handler, error handler
 - Simple logger utility
+- POST /api/ingest-repo: clones GitHub repos (shallow), extracts .js/.ts/.py/.java files, ignores node_modules/dist/build, returns paths + content, auto-cleans temp dirs
 
 ## Prioritized Backlog
 - P0: AI logic integration (core copilot features)
