@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-04-09T15:02:11.623375",
+  "total_tests": 6,
+  "passed_tests": 6,
+  "success_rate": "100.0%",
+  "test_details": [
+    {
+      "test": "Bcrypt hash format",
+      "success": true,
+      "details": "Password hashing and verification working correctly",
+      "timestamp": "2026-04-09T15:02:09.992161"
+    },
+    {
+      "test": "Admin seeded on startup",
+      "success": true,
+      "details": "Admin user successfully seeded and can login",
+      "timestamp": "2026-04-09T15:02:10.216254"
+    },
+    {
+      "test": "Invalid JWT token",
+      "success": true,
+      "details": "JWT token structure validation working correctly",
+      "timestamp": "2026-04-09T15:02:10.425365"
+    },
+    {
+      "test": "Token expiration format",
+      "success": true,
+      "details": "Token expires in 86400 seconds (~24h)",
+      "timestamp": "2026-04-09T15:02:10.607882"
+    },
+    {
+      "test": "Email normalization",
+      "success": true,
+      "details": "Email normalization working correctly",
+      "timestamp": "2026-04-09T15:02:10.982543"
+    },
+    {
+      "test": "Password security",
+      "success": true,
+      "details": "All password security tests passed",
+      "timestamp": "2026-04-09T15:02:11.622512"
+    }
+  ]
+}

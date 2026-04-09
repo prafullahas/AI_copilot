@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-04-09T15:01:04.431706",
+  "total_tests": 12,
+  "passed_tests": 12,
+  "success_rate": "100.0%",
+  "test_details": [
+    {
+      "test": "GET /api/health",
+      "success": true,
+      "details": "Status: 200, Response: {'status': 'ok', 'uptime': 171.692454303, 'timestamp': '2026-04-09T15:01:01.591Z'}",
+      "timestamp": "2026-04-09T15:01:01.608254"
+    },
+    {
+      "test": "GET /api/info includes auth",
+      "success": true,
+      "details": "Auth endpoints found: ['/auth/register', '/auth/login']",
+      "timestamp": "2026-04-09T15:01:01.718362"
+    },
+    {
+      "test": "POST /api/auth/register valid",
+      "success": true,
+      "details": "Successfully registered user: testuser_fdbd8a31@example.com, token length: 225",
+      "timestamp": "2026-04-09T15:01:01.930301"
+    },
+    {
+      "test": "POST /api/auth/register duplicate",
+      "success": true,
+      "details": "Correctly returned 409 for duplicate email",
+      "timestamp": "2026-04-09T15:01:02.350511"
+    },
+    {
+      "test": "POST /api/auth/register missing fields",
+      "success": true,
+      "details": "All missing field cases returned 400",
+      "timestamp": "2026-04-09T15:01:02.971347"
+    },
+    {
+      "test": "POST /api/auth/register short password",
+      "success": true,
+      "details": "Correctly returned 400 for short password",
+      "timestamp": "2026-04-09T15:01:03.146578"
+    },
+    {
+      "test": "POST /api/auth/login admin",
+      "success": true,
+      "details": "Successfully logged in admin: admin@example.com, token length: 209",
+      "timestamp": "2026-04-09T15:01:03.327917"
+    },
+    {
+      "test": "POST /api/auth/login wrong password",
+      "success": true,
+      "details": "Correctly returned 401 for wrong password",
+      "timestamp": "2026-04-09T15:01:03.521593"
+    },
+    {
+      "test": "POST /api/auth/login nonexistent email",
+      "success": true,
+      "details": "Correctly returned 401 for non-existent email",
+      "timestamp": "2026-04-09T15:01:03.684987"
+    },
+    {
+      "test": "POST /api/auth/login missing fields",
+      "success": true,
+      "details": "All missing field cases returned 400",
+      "timestamp": "2026-04-09T15:01:04.312690"
+    },
+    {
+      "test": "JWT token validation",
+      "success": true,
+      "details": "Token valid with claims: sub=69d7be725575c0b8c634d82f, email=admin@example.com, exp=1775833263",
+      "timestamp": "2026-04-09T15:01:04.313491"
+    },
+    {
+      "test": "POST /api/search without auth",
+      "success": true,
+      "details": "Search endpoint works without auth, returned 0 results",
+      "timestamp": "2026-04-09T15:01:04.431032"
+    }
+  ]
+}

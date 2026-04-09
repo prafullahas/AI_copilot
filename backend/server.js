@@ -9,6 +9,8 @@ const infoRoutes = require('./routes/info');
 const retrievalRoutes = require('./routes/retrieval');
 const chatRoutes = require('./routes/chat');
 const searchRoutes = require('./routes/search');
+const authRoutes = require('./routes/authRoutes');
+const { seedAdmin } = require('./services/authService');
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -25,6 +27,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api', healthRoutes);
+app.use('/api', authRoutes);
 app.use('/api', repoRoutes);
 app.use('/api', infoRoutes);
 app.use('/api', retrievalRoutes);
@@ -42,8 +45,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   logger.info(`Server running on http://0.0.0.0:${PORT}`);
+  try {
+    await seedAdmin();
+  } catch (err) {
+    logger.error(`Admin seed failed: ${err.message}`);
+  }
 });
 
 module.exports = app;
