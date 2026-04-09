@@ -10,7 +10,7 @@
 const JS_TS_PATTERNS = [
   { type: 'function', regex: /^(?:export\s+)?(?:export\s+default\s+)?(?:async\s+)?function\s+\w+\s*\(/ },
   { type: 'function', regex: /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?function/ },
-  { type: 'function', regex: /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\(.*\)\s*=>/ },
+  { type: 'function', regex: /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\(.*\)\s*(?::\s*[\w<>\[\]|&,\s]+)?\s*=>/ },
   { type: 'function', regex: /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\w+\s*=>/ },
   { type: 'class',    regex: /^(?:export\s+)?(?:export\s+default\s+)?class\s+\w+/ },
 ];

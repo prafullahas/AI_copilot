@@ -16,6 +16,7 @@ Create a clean backend project using Node.js (Express) for an AI codebase copilo
 - CORS middleware, 404 handler, error handler
 - Simple logger utility
 - POST /api/ingest-repo: clones GitHub repos (shallow), extracts .js/.ts/.py/.java files, ignores node_modules/dist/build, returns paths + content, auto-cleans temp dirs
+- utils/chunkCode.js: Language-aware code chunker — extracts functions and classes using brace-tracking (JS/TS/Java) and indentation-tracking (Python)
 
 ## Prioritized Backlog
 - P0: AI logic integration (core copilot features)
