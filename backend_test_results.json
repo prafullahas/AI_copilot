@@ -1,80 +1,110 @@
 {
-  "timestamp": "2026-04-09T13:38:11.977144",
-  "total_tests": 12,
-  "passed_tests": 12,
+  "timestamp": "2026-04-09T13:52:57.397410",
+  "total_tests": 17,
+  "passed_tests": 17,
   "success_rate": "100.0%",
   "test_details": [
     {
       "test": "GET /api/health",
       "success": true,
-      "details": "Status: 200, Response: {'status': 'ok', 'uptime': 234.243106681, 'timestamp': '2026-04-09T13:37:55.051Z'}",
-      "timestamp": "2026-04-09T13:37:55.068689"
+      "details": "Status: 200, Response: {'status': 'ok', 'uptime': 85.96022299, 'timestamp': '2026-04-09T13:52:32.179Z'}",
+      "timestamp": "2026-04-09T13:52:32.203808"
     },
     {
       "test": "GET /api/info",
       "success": true,
-      "details": "Correct response: name='AI Codebase Copilot', version='1.0.0', endpoints=['/health', '/info', '/ingest-repo', '/retrieve']",
-      "timestamp": "2026-04-09T13:37:55.222213"
+      "details": "Correct response: name='AI Codebase Copilot', version='1.0.0', endpoints=['/health', '/info', '/ingest-repo', '/retrieve', '/chat']",
+      "timestamp": "2026-04-09T13:52:32.315438"
     },
     {
       "test": "Missing repoUrl error handling",
       "success": true,
       "details": "Correctly returned 400 with proper error message",
-      "timestamp": "2026-04-09T13:37:55.327559"
+      "timestamp": "2026-04-09T13:52:32.422687"
     },
     {
       "test": "Invalid repoUrl error handling",
       "success": true,
       "details": "Correctly returned 400 with proper error message",
-      "timestamp": "2026-04-09T13:37:55.486685"
+      "timestamp": "2026-04-09T13:52:32.574712"
     },
     {
       "test": "POST /api/retrieve missing query",
       "success": true,
       "details": "Correctly returned 400 with proper error message",
-      "timestamp": "2026-04-09T13:37:55.600022"
+      "timestamp": "2026-04-09T13:52:32.679296"
     },
     {
       "test": "POST /api/retrieve response structure",
       "success": true,
       "details": "Correctly returned proper structure with 5 results",
-      "timestamp": "2026-04-09T13:37:55.747554"
+      "timestamp": "2026-04-09T13:52:32.815614"
+    },
+    {
+      "test": "POST /api/chat missing question",
+      "success": true,
+      "details": "Correctly returned 400 with proper error message",
+      "timestamp": "2026-04-09T13:52:33.046341"
+    },
+    {
+      "test": "POST /api/chat before ingestion",
+      "success": true,
+      "details": "Correctly returned 'Not found in codebase' with 3 referenced files",
+      "timestamp": "2026-04-09T13:52:33.891987"
     },
     {
       "test": "POST /api/ingest-repo with embeddings",
       "success": true,
       "details": "Successfully processed 141 files, 119 chunks, 119 embeddings (dim=384)",
-      "timestamp": "2026-04-09T13:38:04.217983"
+      "timestamp": "2026-04-09T13:52:41.010570"
     },
     {
       "test": "Embedding count matches chunk count",
       "success": true,
       "details": "Counts match: 119 chunks = 119 embeddings",
-      "timestamp": "2026-04-09T13:38:04.218635"
+      "timestamp": "2026-04-09T13:52:41.011194"
     },
     {
       "test": "POST /api/retrieve valid query",
       "success": true,
       "details": "Successfully retrieved 5 results with proper structure",
-      "timestamp": "2026-04-09T13:38:04.417545"
+      "timestamp": "2026-04-09T13:52:41.148907"
     },
     {
       "test": "Relevance scores sorted",
       "success": true,
       "details": "Scores correctly sorted descending: [0.4939, 0.4685, 0.4679, 0.4677, 0.4529]",
-      "timestamp": "2026-04-09T13:38:04.418308"
+      "timestamp": "2026-04-09T13:52:41.149546"
     },
     {
       "test": "POST /api/retrieve k=3",
       "success": true,
       "details": "Correctly returned exactly 3 results",
-      "timestamp": "2026-04-09T13:38:04.524522"
+      "timestamp": "2026-04-09T13:52:41.272028"
     },
     {
       "test": "Full ingest-retrieve flow",
       "success": true,
       "details": "Successfully retrieved 5 relevant results after ingestion",
-      "timestamp": "2026-04-09T13:38:11.975884"
+      "timestamp": "2026-04-09T13:52:48.455126"
+    },
+    {
+      "test": "POST /api/chat after ingestion",
+      "success": true,
+      "details": "Successfully got answer (length: 333) with 3 referenced files",
+      "timestamp": "2026-04-09T13:52:57.396068"
+    },
+    {
+      "test": "Chat answer quality",
+      "success": true,
+      "details": "Answer contains relevant keywords: ['app', 'express', 'createapp', 'create', 'function']",
+      "timestamp": "2026-04-09T13:52:57.397370"
+    },
+    {
+      "test": "Chat referenced files validity",
+      "success": true,
+      "details": "All 3 referenced files are valid paths: ['test/res.sendFile.js', 'test/res.render.js', 'test/app.render.js']",
+      "timestamp": "2026-04-09T13:52:57.397384"
     }
   ]
 }

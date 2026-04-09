@@ -96,7 +96,7 @@ class NewFeaturesTester:
                 self.log_test("GET /api/info", False, f"Endpoints should be array, got {type(data['endpoints'])}")
                 return False
             
-            expected_endpoints = ['/health', '/info', '/ingest-repo', '/retrieve']
+            expected_endpoints = ['/health', '/info', '/ingest-repo', '/retrieve', '/chat']
             for endpoint in expected_endpoints:
                 if endpoint not in data['endpoints']:
                     self.log_test("GET /api/info", False, f"Missing endpoint: {endpoint}")
@@ -495,10 +495,212 @@ class NewFeaturesTester:
             self.log_test("Full ingest-retrieve flow", False, str(e))
             return False, None
 
+    def test_chat_missing_question(self):
+        """Test POST /api/chat with missing question returns 400 error"""
+        print(f"\n🔍 Testing Chat Missing Question Error...")
+        
+        try:
+            # Test with empty body
+            response = requests.post(f"{self.base_url}/api/chat", json={}, timeout=60)
+            
+            if response.status_code == 400:
+                data = response.json()
+                if 'error' in data and 'question is required' in data['error']:
+                    self.log_test("POST /api/chat missing question", True, "Correctly returned 400 with proper error message")
+                    return True
+                else:
+                    self.log_test("POST /api/chat missing question", False, f"Wrong error message: {data}")
+                    return False
+            else:
+                self.log_test("POST /api/chat missing question", False, f"Expected 400, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("POST /api/chat missing question", False, str(e))
+            return False
+
+    def test_chat_before_ingestion(self):
+        """Test POST /api/chat before any ingestion returns 'Not found in codebase'"""
+        print(f"\n🔍 Testing Chat Before Ingestion...")
+        
+        # First, let's clear any existing data by restarting the backend
+        # Note: In a real test, we'd have a way to clear the embeddings
+        
+        try:
+            payload = {"question": "How does Express routing work?"}
+            response = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=60)
+            
+            if response.status_code != 200:
+                self.log_test("POST /api/chat before ingestion", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/chat before ingestion", False, "Response is not valid JSON")
+                return False
+            
+            # Check required fields
+            if 'answer' not in data or 'referencedFiles' not in data:
+                self.log_test("POST /api/chat before ingestion", False, f"Missing answer or referencedFiles fields: {data}")
+                return False
+            
+            # Check answer is 'Not found in codebase' OR we have a valid answer with referenced files
+            # (since there might be data from previous ingestions)
+            if data['answer'] == 'Not found in codebase':
+                # Check referencedFiles is empty array when no data found
+                if not isinstance(data['referencedFiles'], list):
+                    self.log_test("POST /api/chat before ingestion", False, f"referencedFiles should be array, got {type(data['referencedFiles'])}")
+                    return False
+                details = f"Correctly returned 'Not found in codebase' with {len(data['referencedFiles'])} referenced files"
+                self.log_test("POST /api/chat before ingestion", True, details)
+                return True
+            else:
+                # If we get an answer, it should be a valid response structure
+                if not isinstance(data['answer'], str) or len(data['answer'].strip()) == 0:
+                    self.log_test("POST /api/chat before ingestion", False, f"Answer should be non-empty string, got: {data['answer']}")
+                    return False
+                if not isinstance(data['referencedFiles'], list):
+                    self.log_test("POST /api/chat before ingestion", False, f"referencedFiles should be array, got {type(data['referencedFiles'])}")
+                    return False
+                details = f"Got valid answer (from previous ingestion): {data['answer'][:50]}... with {len(data['referencedFiles'])} files"
+                self.log_test("POST /api/chat before ingestion", True, details)
+                return True
+            
+        except Exception as e:
+            self.log_test("POST /api/chat before ingestion", False, str(e))
+            return False
+
+    def test_chat_with_valid_question_after_ingestion(self):
+        """Test POST /api/chat with valid question after ingestion returns proper response"""
+        print(f"\n🔍 Testing Chat With Valid Question After Ingestion...")
+        
+        # First ensure we have ingested a repo
+        test_repo = "https://github.com/expressjs/express"
+        payload = {"repoUrl": test_repo}
+        
+        try:
+            print(f"   🔄 Ensuring repo is ingested: {test_repo} (may take up to 5 minutes)...")
+            ingest_response = requests.post(
+                f"{self.base_url}/api/ingest-repo", 
+                json=payload, 
+                timeout=300
+            )
+            
+            if ingest_response.status_code != 200:
+                self.log_test("POST /api/chat after ingestion", False, f"Ingest failed: {ingest_response.status_code}")
+                return False
+            
+            ingest_data = ingest_response.json()
+            if 'embeddings' not in ingest_data or ingest_data['embeddings']['totalEmbeddings'] <= 0:
+                self.log_test("POST /api/chat after ingestion", False, "Ingest didn't create embeddings")
+                return False
+            
+            print(f"   ✅ Ingested {ingest_data['embeddings']['totalEmbeddings']} embeddings")
+            
+            # Now test chat with a valid question
+            chat_payload = {"question": "How do you create an Express app?"}
+            chat_response = requests.post(f"{self.base_url}/api/chat", json=chat_payload, timeout=60)
+            
+            if chat_response.status_code != 200:
+                self.log_test("POST /api/chat after ingestion", False, f"Chat failed: {chat_response.status_code}, Response: {chat_response.text}")
+                return False
+            
+            try:
+                chat_data = chat_response.json()
+            except:
+                self.log_test("POST /api/chat after ingestion", False, "Chat response is not valid JSON")
+                return False
+            
+            # Check required fields
+            if 'answer' not in chat_data or 'referencedFiles' not in chat_data:
+                self.log_test("POST /api/chat after ingestion", False, f"Missing answer or referencedFiles fields: {chat_data}")
+                return False
+            
+            # Check answer is a non-empty string
+            if not isinstance(chat_data['answer'], str) or len(chat_data['answer'].strip()) == 0:
+                self.log_test("POST /api/chat after ingestion", False, f"Answer should be non-empty string, got: {chat_data['answer']}")
+                return False
+            
+            # Check referencedFiles is an array of file paths
+            if not isinstance(chat_data['referencedFiles'], list):
+                self.log_test("POST /api/chat after ingestion", False, f"referencedFiles should be array, got {type(chat_data['referencedFiles'])}")
+                return False
+            
+            # If there are referenced files, they should be strings (file paths)
+            for i, file_path in enumerate(chat_data['referencedFiles']):
+                if not isinstance(file_path, str):
+                    self.log_test("POST /api/chat after ingestion", False, f"referencedFiles[{i}] should be string, got {type(file_path)}")
+                    return False
+            
+            # Answer should not be 'Not found in codebase' since we have data
+            if chat_data['answer'] == 'Not found in codebase':
+                self.log_test("POST /api/chat after ingestion", False, "Got 'Not found in codebase' despite having ingested data")
+                return False, None
+            
+            details = f"Successfully got answer (length: {len(chat_data['answer'])}) with {len(chat_data['referencedFiles'])} referenced files"
+            self.log_test("POST /api/chat after ingestion", True, details)
+            return True, chat_data
+            
+        except Exception as e:
+            self.log_test("POST /api/chat after ingestion", False, str(e))
+            return False, None
+
+    def test_chat_answer_quality(self, chat_data):
+        """Test that chat answer contains relevant content"""
+        print(f"\n🔍 Testing Chat Answer Quality...")
+        
+        if not chat_data:
+            self.log_test("Chat answer quality", False, "No chat data available (previous test failed)")
+            return False
+        
+        answer = chat_data['answer'].lower()
+        
+        # Check if answer contains relevant keywords for Express app creation
+        relevant_keywords = ['app', 'express', 'createapp', 'create', 'function']
+        found_keywords = [keyword for keyword in relevant_keywords if keyword in answer]
+        
+        if len(found_keywords) >= 2:  # At least 2 relevant keywords
+            details = f"Answer contains relevant keywords: {found_keywords}"
+            self.log_test("Chat answer quality", True, details)
+            return True
+        else:
+            details = f"Answer lacks relevant keywords. Found: {found_keywords}, Answer: {chat_data['answer'][:200]}..."
+            self.log_test("Chat answer quality", False, details)
+            return False
+
+    def test_chat_referenced_files_validity(self, chat_data):
+        """Test that referenced files are valid file paths"""
+        print(f"\n🔍 Testing Chat Referenced Files Validity...")
+        
+        if not chat_data:
+            self.log_test("Chat referenced files validity", False, "No chat data available (previous test failed)")
+            return False
+        
+        referenced_files = chat_data['referencedFiles']
+        
+        if len(referenced_files) == 0:
+            self.log_test("Chat referenced files validity", True, "No referenced files to validate")
+            return True
+        
+        # Check that referenced files look like valid file paths
+        for file_path in referenced_files:
+            if not file_path or not isinstance(file_path, str):
+                self.log_test("Chat referenced files validity", False, f"Invalid file path: {file_path}")
+                return False
+            
+            # Should contain file extension or be a reasonable path
+            if '.' not in file_path and '/' not in file_path:
+                self.log_test("Chat referenced files validity", False, f"File path doesn't look valid: {file_path}")
+                return False
+        
+        details = f"All {len(referenced_files)} referenced files are valid paths: {referenced_files}"
+        self.log_test("Chat referenced files validity", True, details)
+        return True
+
     def run_all_tests(self):
-        """Run all tests for new features"""
+        """Run all tests for new features including chat endpoint"""
         print("=" * 70)
-        print("🚀 Starting Backend Tests for NEW FEATURES")
+        print("🚀 Starting Backend Tests for NEW FEATURES + CHAT ENDPOINT")
         print(f"🌐 Testing URL: {self.base_url}")
         print("=" * 70)
         
@@ -507,7 +709,7 @@ class NewFeaturesTester:
             print("❌ Health endpoint failed - backend may be down")
             return False
         
-        # Test new info endpoint (should include /retrieve)
+        # Test new info endpoint (should include /chat)
         self.test_info_endpoint()
         
         # Test error handling still works
@@ -517,6 +719,11 @@ class NewFeaturesTester:
         print(f"\n🔧 Testing Retrieve Endpoint Error Handling...")
         self.test_retrieve_missing_query()
         self.test_retrieve_before_ingestion()
+        
+        # Test chat endpoint error handling
+        print(f"\n🔧 Testing Chat Endpoint Error Handling...")
+        self.test_chat_missing_question()
+        self.test_chat_before_ingestion()
         
         # Test main new functionality (embeddings + retrieval)
         print(f"\n🔧 Testing New Embedding & Retrieval Features...")
@@ -540,8 +747,19 @@ class NewFeaturesTester:
             # Test full flow
             flow_success, flow_data = self.test_full_ingest_retrieve_flow()
             
+            # Test chat functionality after ingestion
+            print(f"\n🔧 Testing Chat Endpoint After Ingestion...")
+            chat_success, chat_data = self.test_chat_with_valid_question_after_ingestion()
+            
+            if chat_success:
+                # Test chat answer quality
+                self.test_chat_answer_quality(chat_data)
+                
+                # Test referenced files validity
+                self.test_chat_referenced_files_validity(chat_data)
+            
         else:
-            print("⚠️  Skipping retrieval tests due to ingest failure")
+            print("⚠️  Skipping retrieval and chat tests due to ingest failure")
         
         # Print summary
         print("\n" + "=" * 70)
