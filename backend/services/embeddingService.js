@@ -1,87 +1,125 @@
 /**
- * embeddingService - Local embeddings via @xenova/transformers + FAISS vector storage.
+ * embeddingService - TF-IDF vectorizer + cosine similarity search.
  *
- * Model: Xenova/all-MiniLM-L6-v2 (384-dim, runs locally via ONNX)
- * Index: FAISS IndexFlatIP (inner product on normalized vectors = cosine similarity)
+ * Pure JS, zero native dependencies. Same API as the previous FAISS-based version.
+ * Optimized for code search at repo scale (hundreds of chunks).
  */
 
-const { IndexFlatIP } = require('faiss-node');
 const logger = require('../utils/logger');
 
-const DIMENSION = 384;
+let vocabulary = new Map(); // term -> index
+let idf = [];              // idf[termIndex] = IDF value
+let vectors = [];          // vectors[docIndex] = Float64Array (TF-IDF)
+let metadata = [];         // metadata[docIndex] = { filePath, type, content, preview }
 
-let extractor = null;
-let index = null;
-let metadata = []; // parallel array: metadata[i] corresponds to FAISS vector at position i
+// --- Tokenizer (code-aware) ---
 
-// --- Lazy model init ---
-
-const init = async () => {
-  if (extractor) return;
-  logger.info('Loading embedding model (first call only)...');
-  const { pipeline } = await import('@xenova/transformers');
-  extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-  logger.info('Embedding model loaded');
+const tokenize = (text) => {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 1);
 };
 
-// --- Reset index (called per ingestion to avoid stale data) ---
+// --- Reset ---
 
 const resetIndex = () => {
-  index = new IndexFlatIP(DIMENSION);
+  vocabulary = new Map();
+  idf = [];
+  vectors = [];
   metadata = [];
 };
 
-// --- Generate embedding for a single text ---
+// --- Build TF-IDF vectors for all chunks ---
 
-const embed = async (text) => {
-  await init();
-  const output = await extractor(text, { pooling: 'mean', normalize: true });
-  return Array.from(output.data);
-};
-
-// --- Embed an array of chunks and store in FAISS ---
-
-/**
- * @param {{ content: string, filePath: string, type: string }[]} chunks
- * @returns {{ totalEmbeddings: number, dimension: number }}
- */
 const embedAndStore = async (chunks) => {
-  await init();
   resetIndex();
 
-  for (const chunk of chunks) {
-    const vector = await embed(chunk.content);
-    index.add(vector);
+  // 1. Tokenize all docs
+  const docs = chunks.map((c) => tokenize(c.content));
+
+  // 2. Build vocabulary + document frequency
+  const df = new Map();
+  for (const tokens of docs) {
+    const seen = new Set(tokens);
+    for (const t of seen) {
+      df.set(t, (df.get(t) || 0) + 1);
+    }
+  }
+
+  // 3. Assign indices and compute IDF
+  let idx = 0;
+  const n = docs.length;
+  for (const [term, freq] of df) {
+    vocabulary.set(term, idx);
+    idx++;
+  }
+  idf = new Float64Array(vocabulary.size);
+  for (const [term, freq] of df) {
+    idf[vocabulary.get(term)] = Math.log((n + 1) / (freq + 1)) + 1;
+  }
+
+  // 4. Build TF-IDF vector per doc and store metadata
+  for (let i = 0; i < chunks.length; i++) {
+    const tf = new Float64Array(vocabulary.size);
+    for (const t of docs[i]) {
+      const ti = vocabulary.get(t);
+      if (ti !== undefined) tf[ti]++;
+    }
+    // TF-IDF = tf * idf, then L2-normalize
+    for (let j = 0; j < tf.length; j++) tf[j] *= idf[j];
+    const norm = Math.sqrt(tf.reduce((s, v) => s + v * v, 0)) || 1;
+    for (let j = 0; j < tf.length; j++) tf[j] /= norm;
+
+    vectors.push(tf);
     metadata.push({
-      filePath: chunk.filePath,
-      type: chunk.type,
-      content: chunk.content,
-      preview: chunk.content.split('\n')[0].trim(),
+      filePath: chunks[i].filePath,
+      type: chunks[i].type,
+      content: chunks[i].content,
+      preview: chunks[i].content.split('\n')[0].trim(),
     });
   }
 
-  logger.info(`Stored ${metadata.length} embeddings (${DIMENSION}-dim)`);
-  return { totalEmbeddings: metadata.length, dimension: DIMENSION };
+  const dimension = vocabulary.size;
+  logger.info(`Stored ${metadata.length} vectors (${dimension}-dim TF-IDF)`);
+  return { totalEmbeddings: metadata.length, dimension };
 };
 
-// --- Search the index ---
+// --- Vectorize a query ---
 
-/**
- * @param {string} query - natural language query
- * @param {number} k - number of results
- * @returns {{ filePath: string, type: string, preview: string, score: number }[]}
- */
-const search = async (query, k = 5) => {
-  if (!index || metadata.length === 0) {
-    return [];
+const embedQuery = (text) => {
+  const tokens = tokenize(text);
+  const vec = new Float64Array(vocabulary.size);
+  for (const t of tokens) {
+    const ti = vocabulary.get(t);
+    if (ti !== undefined) vec[ti] = idf[ti];
   }
-  const vector = await embed(query);
-  const safeK = Math.min(k, metadata.length);
-  const { distances, labels } = index.search(vector, safeK);
+  const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
+  for (let j = 0; j < vec.length; j++) vec[j] /= norm;
+  return vec;
+};
 
-  return labels.map((idx, i) => ({
-    ...metadata[idx],
-    score: distances[i],
+// --- Cosine similarity (dot product of L2-normalized vectors) ---
+
+const dot = (a, b) => {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+  return s;
+};
+
+// --- Search ---
+
+const search = async (query, k = 5) => {
+  if (vectors.length === 0) return [];
+
+  const qVec = embedQuery(query);
+  const scores = vectors.map((v, i) => ({ i, score: dot(qVec, v) }));
+  scores.sort((a, b) => b.score - a.score);
+
+  return scores.slice(0, k).map((s) => ({
+    ...metadata[s.i],
+    score: s.score,
   }));
 };
 
