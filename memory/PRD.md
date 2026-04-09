@@ -22,6 +22,8 @@ Create a clean backend project using Node.js (Express) for an AI codebase copilo
 - POST /api/retrieve: Semantic code search — converts query to embedding, searches FAISS, returns top-k chunks with content, file, relevance_score
 - POST /api/chat: LLM-powered Q&A using GPT-4o-mini via Emergent proxy. Retrieves top 3 chunks, sends to LLM with strict context-only prompt, returns { answer, referencedFiles }
 - services/llmService.js: Lazy-init OpenAI client, system prompt enforces context-only answers, 300 max_tokens, temperature 0
+- POST /api/search: Semantic code search (no LLM), reuses retrievalService, returns top 5 filtered chunks
+- Relevance threshold (0.2) in retrievalService — filters low-score results across both /search and /retrieve
 
 ## Prioritized Backlog
 - P0: AI logic integration (core copilot features)
