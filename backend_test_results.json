@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-04-09T13:08:14.991189",
+  "total_tests": 7,
+  "passed_tests": 7,
+  "success_rate": "100.0%",
+  "test_details": [
+    {
+      "test": "Health endpoint",
+      "success": true,
+      "details": "Status: 200, Response: {'status': 'ok', 'uptime': 174.254116421, 'timestamp': '2026-04-09T13:08:12.959Z'}",
+      "timestamp": "2026-04-09T13:08:12.978991"
+    },
+    {
+      "test": "Missing RepoUrl",
+      "success": true,
+      "details": "Correctly returned 400 with proper error message",
+      "timestamp": "2026-04-09T13:08:13.099360"
+    },
+    {
+      "test": "Invalid GitHub URLs",
+      "success": true,
+      "details": "All 6 invalid URLs correctly rejected",
+      "timestamp": "2026-04-09T13:08:13.978559"
+    },
+    {
+      "test": "Nonexistent Repository",
+      "success": true,
+      "details": "Correctly handled clone failure",
+      "timestamp": "2026-04-09T13:08:14.347555"
+    },
+    {
+      "test": "Valid GitHub URL",
+      "success": true,
+      "details": "Successfully extracted 141 files",
+      "timestamp": "2026-04-09T13:08:14.990395"
+    },
+    {
+      "test": "File Extension Filtering",
+      "success": true,
+      "details": "All 141 files have valid extensions (.js, .ts, .py, .java)",
+      "timestamp": "2026-04-09T13:08:14.991117"
+    },
+    {
+      "test": "Directory Filtering",
+      "success": true,
+      "details": "No files found in ignored directories (node_modules, dist, build)",
+      "timestamp": "2026-04-09T13:08:14.991167"
+    }
+  ]
+}
