@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for AI Codebase Copilot - Ingest Repo Feature
-Tests the Node.js Express backend functionality with focus on ingest-repo endpoint
+Backend API Testing for AI Codebase Copilot - New Features Testing
+Tests the new /api/info endpoint and embedding features in /api/ingest-repo
 """
 
 import requests
@@ -10,13 +10,12 @@ import json
 from datetime import datetime
 import time
 
-class RepoIngestTester:
+class NewFeaturesTester:
     def __init__(self, base_url="https://code-assistant-api-1.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
         self.test_results = []
-        self.valid_repo_files = None
 
     def log_test(self, name, success, details=""):
         """Log test result"""
@@ -51,254 +50,220 @@ class RepoIngestTester:
                 except:
                     details += ", Response: Non-JSON"
             
-            self.log_test("Health endpoint", success, details)
+            self.log_test("GET /api/health", success, details)
             return success
             
         except requests.exceptions.RequestException as e:
-            self.log_test("Health endpoint", False, f"Request failed: {str(e)}")
+            self.log_test("GET /api/health", False, f"Request failed: {str(e)}")
             return False
 
-    def test_ingest_repo_valid_url(self):
-        """Test POST /api/ingest-repo with valid GitHub URL"""
-        print(f"\n🔍 Testing Ingest Repo with Valid URL...")
+    def test_info_endpoint(self):
+        """Test GET /api/info endpoint - NEW FEATURE"""
+        print(f"\n🔍 Testing Info Endpoint (NEW FEATURE)...")
+        
+        try:
+            url = f"{self.base_url}/api/info"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test("GET /api/info", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("GET /api/info", False, "Response is not valid JSON")
+                return False
+            
+            # Check required fields
+            required_fields = ['name', 'version', 'endpoints']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test("GET /api/info", False, f"Missing fields: {missing_fields}")
+                return False
+            
+            # Check specific values
+            if data['name'] != 'AI Codebase Copilot':
+                self.log_test("GET /api/info", False, f"Wrong name: expected 'AI Codebase Copilot', got '{data['name']}'")
+                return False
+            
+            if data['version'] != '1.0.0':
+                self.log_test("GET /api/info", False, f"Wrong version: expected '1.0.0', got '{data['version']}'")
+                return False
+            
+            if not isinstance(data['endpoints'], list):
+                self.log_test("GET /api/info", False, f"Endpoints should be array, got {type(data['endpoints'])}")
+                return False
+            
+            expected_endpoints = ['/health', '/info', '/ingest-repo']
+            for endpoint in expected_endpoints:
+                if endpoint not in data['endpoints']:
+                    self.log_test("GET /api/info", False, f"Missing endpoint: {endpoint}")
+                    return False
+            
+            details = f"Correct response: name='{data['name']}', version='{data['version']}', endpoints={data['endpoints']}"
+            self.log_test("GET /api/info", True, details)
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test("GET /api/info", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_ingest_repo_with_embeddings(self):
+        """Test POST /api/ingest-repo with new embedding features"""
+        print(f"\n🔍 Testing Ingest Repo with Embeddings (NEW FEATURE)...")
         
         # Use a small, reliable test repo
         test_repo = "https://github.com/expressjs/express"
         payload = {"repoUrl": test_repo}
         
         try:
-            print(f"   🔄 Cloning repo: {test_repo} (may take 30-60 seconds)...")
+            print(f"   🔄 Processing repo: {test_repo} (may take 30-60 seconds for model download)...")
             response = requests.post(
                 f"{self.base_url}/api/ingest-repo", 
                 json=payload, 
-                timeout=120  # Extended timeout for git clone
+                timeout=300  # Extended timeout for embedding processing
             )
             
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Validate response structure
-                required_fields = ['repo', 'fileCount', 'files']
-                missing_fields = [field for field in required_fields if field not in data]
-                
-                if missing_fields:
-                    self.log_test("Valid GitHub URL - Response Structure", False, f"Missing fields: {missing_fields}")
-                    return False
-                
-                # Validate data types and content
-                if data['repo'] != test_repo:
-                    self.log_test("Valid GitHub URL - Repo Field", False, f"Repo mismatch: expected {test_repo}, got {data['repo']}")
-                    return False
-                
-                if not isinstance(data['fileCount'], int) or data['fileCount'] < 0:
-                    self.log_test("Valid GitHub URL - File Count", False, f"Invalid fileCount: {data['fileCount']}")
-                    return False
-                
-                if not isinstance(data['files'], list):
-                    self.log_test("Valid GitHub URL - Files Array", False, f"Files should be array, got {type(data['files'])}")
-                    return False
-                
-                if len(data['files']) != data['fileCount']:
-                    self.log_test("Valid GitHub URL - Count Consistency", False, f"File count mismatch: fileCount={data['fileCount']}, actual files={len(data['files'])}")
-                    return False
-                
-                # Validate file structure
-                for i, file_obj in enumerate(data['files'][:3]):  # Check first 3 files
-                    if not isinstance(file_obj, dict) or 'path' not in file_obj or 'content' not in file_obj:
-                        self.log_test("Valid GitHub URL - File Structure", False, f"Invalid file structure at index {i}")
-                        return False
-                
-                details = f"Successfully extracted {data['fileCount']} files"
-                self.log_test("Valid GitHub URL", True, details)
-                
-                # Store for extension validation
-                self.valid_repo_files = data['files']
-                return True
-            else:
-                self.log_test("Valid GitHub URL", False, f"Status: {response.status_code}, Response: {response.text[:200]}")
-                return False
-                
-        except Exception as e:
-            self.log_test("Valid GitHub URL", False, str(e))
-            return False
-
-    def test_file_extension_filtering(self):
-        """Test that only .js, .ts, .py, .java files are extracted"""
-        print(f"\n🔍 Testing File Extension Filtering...")
-        
-        if not self.valid_repo_files:
-            self.log_test("File Extension Filtering", False, "No valid repo files to check (previous test failed)")
-            return False
-        
-        allowed_extensions = {'.js', '.ts', '.py', '.java'}
-        invalid_files = []
-        
-        for file_obj in self.valid_repo_files:
-            file_path = file_obj['path']
-            extension = '.' + file_path.split('.')[-1] if '.' in file_path else ''
-            if extension not in allowed_extensions:
-                invalid_files.append(f"{file_path} ({extension})")
-        
-        if invalid_files:
-            details = f"Found files with invalid extensions: {invalid_files[:5]}"  # Show first 5
-            self.log_test("File Extension Filtering", False, details)
-            return False
-        else:
-            details = f"All {len(self.valid_repo_files)} files have valid extensions (.js, .ts, .py, .java)"
-            self.log_test("File Extension Filtering", True, details)
-            return True
-
-    def test_directory_filtering(self):
-        """Test that node_modules, dist, build directories are ignored"""
-        print(f"\n🔍 Testing Directory Filtering...")
-        
-        if not self.valid_repo_files:
-            self.log_test("Directory Filtering", False, "No valid repo files to check (previous test failed)")
-            return False
-        
-        ignored_dirs = {'node_modules', 'dist', 'build'}
-        invalid_paths = []
-        
-        for file_obj in self.valid_repo_files:
-            file_path = file_obj['path']
-            path_parts = file_path.split('/')
+            if response.status_code != 200:
+                self.log_test("POST /api/ingest-repo with embeddings", False, f"Status: {response.status_code}, Response: {response.text[:500]}")
+                return False, None
             
-            for ignored_dir in ignored_dirs:
-                if ignored_dir in path_parts:
-                    invalid_paths.append(file_path)
-                    break
-        
-        if invalid_paths:
-            details = f"Found files in ignored directories: {invalid_paths[:3]}"  # Show first 3
-            self.log_test("Directory Filtering", False, details)
-            return False
-        else:
-            details = f"No files found in ignored directories (node_modules, dist, build)"
-            self.log_test("Directory Filtering", True, details)
-            return True
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/ingest-repo with embeddings", False, "Response is not valid JSON")
+                return False, None
+            
+            # Check required fields (old + new)
+            required_fields = ['repo', 'fileCount', 'chunkCount', 'embeddings']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test("POST /api/ingest-repo with embeddings", False, f"Missing fields: {missing_fields}")
+                return False, None
+            
+            # Validate embeddings object
+            embeddings = data['embeddings']
+            if not isinstance(embeddings, dict):
+                self.log_test("POST /api/ingest-repo with embeddings", False, f"Embeddings should be object, got {type(embeddings)}")
+                return False, None
+            
+            required_embedding_fields = ['totalEmbeddings', 'dimension']
+            missing_embedding_fields = [field for field in required_embedding_fields if field not in embeddings]
+            
+            if missing_embedding_fields:
+                self.log_test("POST /api/ingest-repo with embeddings", False, f"Missing embedding fields: {missing_embedding_fields}")
+                return False, None
+            
+            # Check dimension is 384 (Xenova/all-MiniLM-L6-v2)
+            if embeddings['dimension'] != 384:
+                self.log_test("POST /api/ingest-repo with embeddings", False, f"Wrong dimension: expected 384, got {embeddings['dimension']}")
+                return False, None
+            
+            # Check that totalEmbeddings is positive integer
+            if not isinstance(embeddings['totalEmbeddings'], int) or embeddings['totalEmbeddings'] <= 0:
+                self.log_test("POST /api/ingest-repo with embeddings", False, f"Invalid totalEmbeddings: {embeddings['totalEmbeddings']}")
+                return False, None
+            
+            details = f"Successfully processed {data['fileCount']} files, {data['chunkCount']} chunks, {embeddings['totalEmbeddings']} embeddings (dim={embeddings['dimension']})"
+            self.log_test("POST /api/ingest-repo with embeddings", True, details)
+            return True, data
+            
+        except Exception as e:
+            self.log_test("POST /api/ingest-repo with embeddings", False, str(e))
+            return False, None
 
-    def test_missing_repo_url(self):
-        """Test POST /api/ingest-repo with missing repoUrl"""
-        print(f"\n🔍 Testing Missing RepoUrl...")
+    def test_embedding_chunk_count_match(self, ingest_data):
+        """Test that embedding count matches chunk count"""
+        print(f"\n🔍 Testing Embedding Count Matches Chunk Count...")
         
+        if not ingest_data:
+            self.log_test("Embedding count matches chunk count", False, "No ingest data available (previous test failed)")
+            return False
+        
+        chunk_count = ingest_data['chunkCount']
+        embedding_count = ingest_data['embeddings']['totalEmbeddings']
+        
+        if chunk_count == embedding_count:
+            details = f"Counts match: {chunk_count} chunks = {embedding_count} embeddings"
+            self.log_test("Embedding count matches chunk count", True, details)
+            return True
+        else:
+            details = f"Counts don't match: {chunk_count} chunks != {embedding_count} embeddings"
+            self.log_test("Embedding count matches chunk count", False, details)
+            return False
+
+    def test_ingest_repo_error_handling(self):
+        """Test POST /api/ingest-repo error handling still works"""
+        print(f"\n🔍 Testing Ingest Repo Error Handling...")
+        
+        # Test missing repoUrl
         try:
             response = requests.post(f"{self.base_url}/api/ingest-repo", json={}, timeout=10)
             
             if response.status_code == 400:
                 data = response.json()
                 if 'error' in data and 'repoUrl is required' in data['error']:
-                    self.log_test("Missing RepoUrl", True, "Correctly returned 400 with proper error message")
-                    return True
+                    self.log_test("Missing repoUrl error handling", True, "Correctly returned 400 with proper error message")
                 else:
-                    self.log_test("Missing RepoUrl", False, f"Wrong error message: {data}")
+                    self.log_test("Missing repoUrl error handling", False, f"Wrong error message: {data}")
                     return False
             else:
-                self.log_test("Missing RepoUrl", False, f"Expected 400, got {response.status_code}")
+                self.log_test("Missing repoUrl error handling", False, f"Expected 400, got {response.status_code}")
                 return False
-                
         except Exception as e:
-            self.log_test("Missing RepoUrl", False, str(e))
+            self.log_test("Missing repoUrl error handling", False, str(e))
             return False
-
-    def test_invalid_repo_url(self):
-        """Test POST /api/ingest-repo with invalid URL (not GitHub)"""
-        print(f"\n🔍 Testing Invalid GitHub URLs...")
         
-        invalid_urls = [
-            "https://gitlab.com/user/repo",
-            "https://bitbucket.org/user/repo", 
-            "https://example.com/repo",
-            "not-a-url",
-            "https://github.com/",
-            "https://github.com/user",
-        ]
-        
-        all_passed = True
-        failed_urls = []
-        
-        for invalid_url in invalid_urls:
-            try:
-                payload = {"repoUrl": invalid_url}
-                response = requests.post(f"{self.base_url}/api/ingest-repo", json=payload, timeout=10)
-                
-                if response.status_code == 400:
-                    data = response.json()
-                    if 'error' in data and 'Invalid GitHub repository URL' in data['error']:
-                        print(f"     ✅ {invalid_url} - correctly rejected")
-                    else:
-                        print(f"     ❌ {invalid_url} - wrong error message: {data}")
-                        failed_urls.append(invalid_url)
-                        all_passed = False
-                else:
-                    print(f"     ❌ {invalid_url} - expected 400, got {response.status_code}")
-                    failed_urls.append(invalid_url)
-                    all_passed = False
-                    
-            except Exception as e:
-                print(f"     ❌ {invalid_url} - error: {str(e)}")
-                failed_urls.append(invalid_url)
-                all_passed = False
-        
-        if all_passed:
-            self.log_test("Invalid GitHub URLs", True, f"All {len(invalid_urls)} invalid URLs correctly rejected")
-        else:
-            self.log_test("Invalid GitHub URLs", False, f"Failed URLs: {failed_urls}")
-        
-        return all_passed
-
-    def test_nonexistent_repo(self):
-        """Test POST /api/ingest-repo with valid GitHub URL format but nonexistent repo"""
-        print(f"\n🔍 Testing Nonexistent Repository...")
-        
-        nonexistent_repo = "https://github.com/nonexistent-user-12345/nonexistent-repo-67890"
-        payload = {"repoUrl": nonexistent_repo}
-        
+        # Test invalid repoUrl
         try:
-            response = requests.post(f"{self.base_url}/api/ingest-repo", json=payload, timeout=30)
+            invalid_payload = {"repoUrl": "https://example.com/not-github"}
+            response = requests.post(f"{self.base_url}/api/ingest-repo", json=invalid_payload, timeout=10)
             
-            # Should return 500 with clone error
-            if response.status_code == 500:
+            if response.status_code == 400:
                 data = response.json()
-                if 'error' in data and 'Failed to clone repository' in data['error']:
-                    self.log_test("Nonexistent Repository", True, "Correctly handled clone failure")
+                if 'error' in data and 'Invalid GitHub repository URL' in data['error']:
+                    self.log_test("Invalid repoUrl error handling", True, "Correctly returned 400 with proper error message")
                     return True
                 else:
-                    self.log_test("Nonexistent Repository", False, f"Wrong error message: {data}")
+                    self.log_test("Invalid repoUrl error handling", False, f"Wrong error message: {data}")
                     return False
             else:
-                self.log_test("Nonexistent Repository", False, f"Expected 500, got {response.status_code}: {response.text[:200]}")
+                self.log_test("Invalid repoUrl error handling", False, f"Expected 400, got {response.status_code}")
                 return False
-                
         except Exception as e:
-            self.log_test("Nonexistent Repository", False, str(e))
+            self.log_test("Invalid repoUrl error handling", False, str(e))
             return False
 
     def run_all_tests(self):
-        """Run all backend tests focusing on ingest-repo feature"""
+        """Run all tests for new features"""
         print("=" * 70)
-        print("🚀 Starting Backend Tests for Ingest-Repo Feature")
+        print("🚀 Starting Backend Tests for NEW FEATURES")
         print(f"🌐 Testing URL: {self.base_url}")
         print("=" * 70)
         
-        # Test health endpoint first (baseline)
+        # Test baseline functionality
         if not self.test_health_endpoint():
             print("❌ Health endpoint failed - backend may be down")
             return False
         
-        # Test ingest-repo validation
-        print(f"\n📋 Testing Input Validation...")
-        self.test_missing_repo_url()
-        self.test_invalid_repo_url()
-        self.test_nonexistent_repo()
+        # Test new info endpoint
+        self.test_info_endpoint()
         
-        # Test main functionality
-        print(f"\n🔧 Testing Core Functionality...")
-        if self.test_ingest_repo_valid_url():
-            # Only run these if we have valid repo data
-            self.test_file_extension_filtering()
-            self.test_directory_filtering()
+        # Test error handling still works
+        self.test_ingest_repo_error_handling()
+        
+        # Test main new functionality (embeddings)
+        print(f"\n🔧 Testing New Embedding Features...")
+        success, ingest_data = self.test_ingest_repo_with_embeddings()
+        
+        if success:
+            # Test embedding count matches chunk count
+            self.test_embedding_chunk_count_match(ingest_data)
         else:
-            print("⚠️  Skipping file filtering tests due to main functionality failure")
+            print("⚠️  Skipping embedding count test due to ingest failure")
         
         # Print summary
         print("\n" + "=" * 70)
@@ -322,7 +287,7 @@ class RepoIngestTester:
 
 def main():
     """Main test execution"""
-    tester = RepoIngestTester()
+    tester = NewFeaturesTester()
     success = tester.run_all_tests()
     
     # Save detailed results

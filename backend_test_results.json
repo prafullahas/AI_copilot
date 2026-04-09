@@ -1,50 +1,44 @@
 {
-  "timestamp": "2026-04-09T13:08:14.991189",
-  "total_tests": 7,
-  "passed_tests": 7,
+  "timestamp": "2026-04-09T13:30:35.306917",
+  "total_tests": 6,
+  "passed_tests": 6,
   "success_rate": "100.0%",
   "test_details": [
     {
-      "test": "Health endpoint",
+      "test": "GET /api/health",
       "success": true,
-      "details": "Status: 200, Response: {'status': 'ok', 'uptime': 174.254116421, 'timestamp': '2026-04-09T13:08:12.959Z'}",
-      "timestamp": "2026-04-09T13:08:12.978991"
+      "details": "Status: 200, Response: {'status': 'ok', 'uptime': 134.765733566, 'timestamp': '2026-04-09T13:30:27.507Z'}",
+      "timestamp": "2026-04-09T13:30:27.523974"
     },
     {
-      "test": "Missing RepoUrl",
+      "test": "GET /api/info",
+      "success": true,
+      "details": "Correct response: name='AI Codebase Copilot', version='1.0.0', endpoints=['/health', '/info', '/ingest-repo']",
+      "timestamp": "2026-04-09T13:30:27.636475"
+    },
+    {
+      "test": "Missing repoUrl error handling",
       "success": true,
       "details": "Correctly returned 400 with proper error message",
-      "timestamp": "2026-04-09T13:08:13.099360"
+      "timestamp": "2026-04-09T13:30:27.780901"
     },
     {
-      "test": "Invalid GitHub URLs",
+      "test": "Invalid repoUrl error handling",
       "success": true,
-      "details": "All 6 invalid URLs correctly rejected",
-      "timestamp": "2026-04-09T13:08:13.978559"
+      "details": "Correctly returned 400 with proper error message",
+      "timestamp": "2026-04-09T13:30:27.969146"
     },
     {
-      "test": "Nonexistent Repository",
+      "test": "POST /api/ingest-repo with embeddings",
       "success": true,
-      "details": "Correctly handled clone failure",
-      "timestamp": "2026-04-09T13:08:14.347555"
+      "details": "Successfully processed 141 files, 119 chunks, 119 embeddings (dim=384)",
+      "timestamp": "2026-04-09T13:30:35.306146"
     },
     {
-      "test": "Valid GitHub URL",
+      "test": "Embedding count matches chunk count",
       "success": true,
-      "details": "Successfully extracted 141 files",
-      "timestamp": "2026-04-09T13:08:14.990395"
-    },
-    {
-      "test": "File Extension Filtering",
-      "success": true,
-      "details": "All 141 files have valid extensions (.js, .ts, .py, .java)",
-      "timestamp": "2026-04-09T13:08:14.991117"
-    },
-    {
-      "test": "Directory Filtering",
-      "success": true,
-      "details": "No files found in ignored directories (node_modules, dist, build)",
-      "timestamp": "2026-04-09T13:08:14.991167"
+      "details": "Counts match: 119 chunks = 119 embeddings",
+      "timestamp": "2026-04-09T13:30:35.306891"
     }
   ]
 }

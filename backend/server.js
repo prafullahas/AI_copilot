@@ -5,6 +5,7 @@ const path = require('path');
 const logger = require('./utils/logger');
 const healthRoutes = require('./routes/health');
 const repoRoutes = require('./routes/repo');
+const infoRoutes = require('./routes/info');
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -22,6 +23,7 @@ app.use(express.json());
 // Routes
 app.use('/api', healthRoutes);
 app.use('/api', repoRoutes);
+app.use('/api', infoRoutes);
 
 // 404 handler
 app.use((req, res) => {
