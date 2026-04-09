@@ -96,7 +96,7 @@ class NewFeaturesTester:
                 self.log_test("GET /api/info", False, f"Endpoints should be array, got {type(data['endpoints'])}")
                 return False
             
-            expected_endpoints = ['/health', '/info', '/ingest-repo']
+            expected_endpoints = ['/health', '/info', '/ingest-repo', '/retrieve']
             for endpoint in expected_endpoints:
                 if endpoint not in data['endpoints']:
                     self.log_test("GET /api/info", False, f"Missing endpoint: {endpoint}")
@@ -237,6 +237,264 @@ class NewFeaturesTester:
             self.log_test("Invalid repoUrl error handling", False, str(e))
             return False
 
+    def test_retrieve_missing_query(self):
+        """Test POST /api/retrieve with missing query returns 400 error"""
+        print(f"\n🔍 Testing Retrieve Missing Query Error...")
+        
+        try:
+            # Test with empty body
+            response = requests.post(f"{self.base_url}/api/retrieve", json={}, timeout=10)
+            
+            if response.status_code == 400:
+                data = response.json()
+                if 'error' in data and 'query is required' in data['error']:
+                    self.log_test("POST /api/retrieve missing query", True, "Correctly returned 400 with proper error message")
+                    return True
+                else:
+                    self.log_test("POST /api/retrieve missing query", False, f"Wrong error message: {data}")
+                    return False
+            else:
+                self.log_test("POST /api/retrieve missing query", False, f"Expected 400, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("POST /api/retrieve missing query", False, str(e))
+            return False
+
+    def test_retrieve_before_ingestion(self):
+        """Test POST /api/retrieve returns proper structure (may have data from previous ingestions)"""
+        print(f"\n🔍 Testing Retrieve Response Structure...")
+        
+        try:
+            payload = {"query": "express middleware"}
+            response = requests.post(f"{self.base_url}/api/retrieve", json=payload, timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test("POST /api/retrieve response structure", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/retrieve response structure", False, "Response is not valid JSON")
+                return False
+            
+            # Check response structure
+            if 'query' not in data or 'results' not in data:
+                self.log_test("POST /api/retrieve response structure", False, f"Missing query or results fields: {data}")
+                return False
+            
+            # Should echo back the query
+            if data['query'] != "express middleware":
+                self.log_test("POST /api/retrieve response structure", False, f"Query mismatch: expected 'express middleware', got '{data['query']}'")
+                return False
+            
+            if not isinstance(data['results'], list):
+                self.log_test("POST /api/retrieve response structure", False, f"Results should be array, got {type(data['results'])}")
+                return False
+            
+            # Check that if there are results, they have proper structure
+            for i, result in enumerate(data['results']):
+                required_fields = ['content', 'file', 'relevance_score']
+                missing_fields = [field for field in required_fields if field not in result]
+                
+                if missing_fields:
+                    self.log_test("POST /api/retrieve response structure", False, f"Result {i} missing fields: {missing_fields}")
+                    return False
+            
+            details = f"Correctly returned proper structure with {len(data['results'])} results"
+            self.log_test("POST /api/retrieve response structure", True, details)
+            return True
+            
+        except Exception as e:
+            self.log_test("POST /api/retrieve response structure", False, str(e))
+            return False
+
+    def test_retrieve_with_valid_query(self):
+        """Test POST /api/retrieve with valid query after ingestion"""
+        print(f"\n🔍 Testing Retrieve With Valid Query...")
+        
+        try:
+            payload = {"query": "express middleware routing"}
+            response = requests.post(f"{self.base_url}/api/retrieve", json=payload, timeout=30)
+            
+            if response.status_code != 200:
+                self.log_test("POST /api/retrieve valid query", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False, None
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/retrieve valid query", False, "Response is not valid JSON")
+                return False, None
+            
+            # Check response structure
+            if 'query' not in data or 'results' not in data:
+                self.log_test("POST /api/retrieve valid query", False, f"Missing query or results fields: {data}")
+                return False, None
+            
+            if data['query'] != "express middleware routing":
+                self.log_test("POST /api/retrieve valid query", False, f"Query mismatch: expected 'express middleware routing', got '{data['query']}'")
+                return False, None
+            
+            if not isinstance(data['results'], list):
+                self.log_test("POST /api/retrieve valid query", False, f"Results should be array, got {type(data['results'])}")
+                return False, None
+            
+            # Should return some results (default k=5)
+            if len(data['results']) == 0:
+                self.log_test("POST /api/retrieve valid query", False, "Expected some results, got empty array")
+                return False, None
+            
+            # Check each result has required fields
+            for i, result in enumerate(data['results']):
+                required_fields = ['content', 'file', 'relevance_score']
+                missing_fields = [field for field in required_fields if field not in result]
+                
+                if missing_fields:
+                    self.log_test("POST /api/retrieve valid query", False, f"Result {i} missing fields: {missing_fields}")
+                    return False, None
+                
+                # Check field types
+                if not isinstance(result['content'], str):
+                    self.log_test("POST /api/retrieve valid query", False, f"Result {i} content should be string, got {type(result['content'])}")
+                    return False, None
+                
+                if not isinstance(result['file'], str):
+                    self.log_test("POST /api/retrieve valid query", False, f"Result {i} file should be string, got {type(result['file'])}")
+                    return False, None
+                
+                if not isinstance(result['relevance_score'], (int, float)):
+                    self.log_test("POST /api/retrieve valid query", False, f"Result {i} relevance_score should be numeric, got {type(result['relevance_score'])}")
+                    return False, None
+            
+            details = f"Successfully retrieved {len(data['results'])} results with proper structure"
+            self.log_test("POST /api/retrieve valid query", True, details)
+            return True, data
+            
+        except Exception as e:
+            self.log_test("POST /api/retrieve valid query", False, str(e))
+            return False, None
+
+    def test_retrieve_with_k_parameter(self):
+        """Test POST /api/retrieve with k=3 returns exactly 3 results"""
+        print(f"\n🔍 Testing Retrieve With k=3 Parameter...")
+        
+        try:
+            payload = {"query": "express application", "k": 3}
+            response = requests.post(f"{self.base_url}/api/retrieve", json=payload, timeout=30)
+            
+            if response.status_code != 200:
+                self.log_test("POST /api/retrieve k=3", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/retrieve k=3", False, "Response is not valid JSON")
+                return False
+            
+            if 'results' not in data:
+                self.log_test("POST /api/retrieve k=3", False, f"Missing results field: {data}")
+                return False
+            
+            if len(data['results']) != 3:
+                self.log_test("POST /api/retrieve k=3", False, f"Expected exactly 3 results, got {len(data['results'])}")
+                return False
+            
+            self.log_test("POST /api/retrieve k=3", True, f"Correctly returned exactly 3 results")
+            return True
+            
+        except Exception as e:
+            self.log_test("POST /api/retrieve k=3", False, str(e))
+            return False
+
+    def test_relevance_scores_sorted(self, retrieve_data):
+        """Test that relevance_score values are numeric and sorted descending"""
+        print(f"\n🔍 Testing Relevance Scores Sorted Descending...")
+        
+        if not retrieve_data or 'results' not in retrieve_data:
+            self.log_test("Relevance scores sorted", False, "No retrieve data available (previous test failed)")
+            return False
+        
+        results = retrieve_data['results']
+        if len(results) < 2:
+            self.log_test("Relevance scores sorted", True, "Only one result, sorting not applicable")
+            return True
+        
+        # Check if scores are sorted in descending order
+        scores = [result['relevance_score'] for result in results]
+        sorted_scores = sorted(scores, reverse=True)
+        
+        if scores == sorted_scores:
+            details = f"Scores correctly sorted descending: {scores}"
+            self.log_test("Relevance scores sorted", True, details)
+            return True
+        else:
+            details = f"Scores not sorted: {scores}, should be: {sorted_scores}"
+            self.log_test("Relevance scores sorted", False, details)
+            return False
+
+    def test_full_ingest_retrieve_flow(self):
+        """Test full flow: ingest repo then retrieve returns relevant chunks"""
+        print(f"\n🔍 Testing Full Ingest-Retrieve Flow...")
+        
+        # First ingest a repo
+        test_repo = "https://github.com/expressjs/express"
+        payload = {"repoUrl": test_repo}
+        
+        try:
+            print(f"   🔄 Ingesting repo: {test_repo} (may take 30-60 seconds)...")
+            ingest_response = requests.post(
+                f"{self.base_url}/api/ingest-repo", 
+                json=payload, 
+                timeout=300
+            )
+            
+            if ingest_response.status_code != 200:
+                self.log_test("Full ingest-retrieve flow", False, f"Ingest failed: {ingest_response.status_code}")
+                return False
+            
+            ingest_data = ingest_response.json()
+            if 'embeddings' not in ingest_data or ingest_data['embeddings']['totalEmbeddings'] <= 0:
+                self.log_test("Full ingest-retrieve flow", False, "Ingest didn't create embeddings")
+                return False
+            
+            print(f"   ✅ Ingested {ingest_data['embeddings']['totalEmbeddings']} embeddings")
+            
+            # Now test retrieval
+            retrieve_payload = {"query": "express router middleware", "k": 5}
+            retrieve_response = requests.post(f"{self.base_url}/api/retrieve", json=retrieve_payload, timeout=30)
+            
+            if retrieve_response.status_code != 200:
+                self.log_test("Full ingest-retrieve flow", False, f"Retrieve failed: {retrieve_response.status_code}")
+                return False
+            
+            retrieve_data = retrieve_response.json()
+            
+            if 'results' not in retrieve_data or len(retrieve_data['results']) == 0:
+                self.log_test("Full ingest-retrieve flow", False, "Retrieve returned no results after ingestion")
+                return False
+            
+            # Check that results contain relevant content
+            results_contain_relevant = False
+            for result in retrieve_data['results']:
+                content_lower = result['content'].lower()
+                if any(keyword in content_lower for keyword in ['express', 'router', 'middleware', 'app']):
+                    results_contain_relevant = True
+                    break
+            
+            if not results_contain_relevant:
+                self.log_test("Full ingest-retrieve flow", False, "Results don't seem relevant to Express.js")
+                return False
+            
+            details = f"Successfully retrieved {len(retrieve_data['results'])} relevant results after ingestion"
+            self.log_test("Full ingest-retrieve flow", True, details)
+            return True, retrieve_data
+            
+        except Exception as e:
+            self.log_test("Full ingest-retrieve flow", False, str(e))
+            return False, None
+
     def run_all_tests(self):
         """Run all tests for new features"""
         print("=" * 70)
@@ -249,21 +507,41 @@ class NewFeaturesTester:
             print("❌ Health endpoint failed - backend may be down")
             return False
         
-        # Test new info endpoint
+        # Test new info endpoint (should include /retrieve)
         self.test_info_endpoint()
         
         # Test error handling still works
         self.test_ingest_repo_error_handling()
         
-        # Test main new functionality (embeddings)
-        print(f"\n🔧 Testing New Embedding Features...")
+        # Test retrieve endpoint error handling
+        print(f"\n🔧 Testing Retrieve Endpoint Error Handling...")
+        self.test_retrieve_missing_query()
+        self.test_retrieve_before_ingestion()
+        
+        # Test main new functionality (embeddings + retrieval)
+        print(f"\n🔧 Testing New Embedding & Retrieval Features...")
         success, ingest_data = self.test_ingest_repo_with_embeddings()
         
         if success:
             # Test embedding count matches chunk count
             self.test_embedding_chunk_count_match(ingest_data)
+            
+            # Test retrieval functionality after ingestion
+            print(f"\n🔧 Testing Retrieval After Ingestion...")
+            retrieve_success, retrieve_data = self.test_retrieve_with_valid_query()
+            
+            if retrieve_success:
+                # Test relevance scores are sorted
+                self.test_relevance_scores_sorted(retrieve_data)
+            
+            # Test k parameter
+            self.test_retrieve_with_k_parameter()
+            
+            # Test full flow
+            flow_success, flow_data = self.test_full_ingest_retrieve_flow()
+            
         else:
-            print("⚠️  Skipping embedding count test due to ingest failure")
+            print("⚠️  Skipping retrieval tests due to ingest failure")
         
         # Print summary
         print("\n" + "=" * 70)

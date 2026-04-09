@@ -55,6 +55,7 @@ const embedAndStore = async (chunks) => {
     metadata.push({
       filePath: chunk.filePath,
       type: chunk.type,
+      content: chunk.content,
       preview: chunk.content.split('\n')[0].trim(),
     });
   }
