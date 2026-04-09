@@ -20,7 +20,8 @@ Create a clean backend project using Node.js (Express) for an AI codebase copilo
 - GET /api/info: Returns project name, version, available endpoints
 - services/embeddingService.js: Local embeddings via @xenova/transformers (Xenova/all-MiniLM-L6-v2, 384-dim) + FAISS (faiss-node) vector storage. Embeds chunks once at ingestion time. Includes search() for retrieval.
 - POST /api/retrieve: Semantic code search — converts query to embedding, searches FAISS, returns top-k chunks with content, file, relevance_score
-- GET /api/info updated with all available endpoints
+- POST /api/chat: LLM-powered Q&A using GPT-4o-mini via Emergent proxy. Retrieves top 3 chunks, sends to LLM with strict context-only prompt, returns { answer, referencedFiles }
+- services/llmService.js: Lazy-init OpenAI client, system prompt enforces context-only answers, 300 max_tokens, temperature 0
 
 ## Prioritized Backlog
 - P0: AI logic integration (core copilot features)
