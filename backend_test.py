@@ -96,7 +96,7 @@ class NewFeaturesTester:
                 self.log_test("GET /api/info", False, f"Endpoints should be array, got {type(data['endpoints'])}")
                 return False
             
-            expected_endpoints = ['/health', '/info', '/ingest-repo', '/retrieve', '/chat']
+            expected_endpoints = ['/health', '/info', '/ingest-repo', '/retrieve', '/chat', '/search']
             for endpoint in expected_endpoints:
                 if endpoint not in data['endpoints']:
                     self.log_test("GET /api/info", False, f"Missing endpoint: {endpoint}")
@@ -697,10 +697,228 @@ class NewFeaturesTester:
         self.log_test("Chat referenced files validity", True, details)
         return True
 
+    def test_search_missing_query(self):
+        """Test POST /api/search with missing query returns 400 error"""
+        print(f"\n🔍 Testing Search Missing Query Error...")
+        
+        try:
+            # Test with empty body
+            response = requests.post(f"{self.base_url}/api/search", json={}, timeout=10)
+            
+            if response.status_code == 400:
+                data = response.json()
+                if 'error' in data and 'query is required' in data['error']:
+                    self.log_test("POST /api/search missing query", True, "Correctly returned 400 with proper error message")
+                    return True
+                else:
+                    self.log_test("POST /api/search missing query", False, f"Wrong error message: {data}")
+                    return False
+            else:
+                self.log_test("POST /api/search missing query", False, f"Expected 400, got {response.status_code}")
+                return False
+        except Exception as e:
+            self.log_test("POST /api/search missing query", False, str(e))
+            return False
+
+    def test_search_before_ingestion(self):
+        """Test POST /api/search before ingestion returns empty array"""
+        print(f"\n🔍 Testing Search Before Ingestion...")
+        
+        try:
+            payload = {"query": "express middleware"}
+            response = requests.post(f"{self.base_url}/api/search", json=payload, timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test("POST /api/search before ingestion", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/search before ingestion", False, "Response is not valid JSON")
+                return False
+            
+            # Should return empty array when no data is ingested
+            if not isinstance(data, list):
+                self.log_test("POST /api/search before ingestion", False, f"Response should be array, got {type(data)}")
+                return False
+            
+            # May return empty array or results from previous ingestions
+            details = f"Returned {len(data)} results (empty array expected if no previous ingestion)"
+            self.log_test("POST /api/search before ingestion", True, details)
+            return True
+            
+        except Exception as e:
+            self.log_test("POST /api/search before ingestion", False, str(e))
+            return False
+
+    def test_search_with_valid_query(self):
+        """Test POST /api/search with valid query returns proper structure"""
+        print(f"\n🔍 Testing Search With Valid Query...")
+        
+        try:
+            payload = {"query": "express middleware routing"}
+            response = requests.post(f"{self.base_url}/api/search", json=payload, timeout=30)
+            
+            if response.status_code != 200:
+                self.log_test("POST /api/search valid query", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False, None
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/search valid query", False, "Response is not valid JSON")
+                return False, None
+            
+            # Should return array
+            if not isinstance(data, list):
+                self.log_test("POST /api/search valid query", False, f"Response should be array, got {type(data)}")
+                return False, None
+            
+            # Check each result has required fields
+            for i, result in enumerate(data):
+                required_fields = ['content', 'file', 'relevance_score']
+                missing_fields = [field for field in required_fields if field not in result]
+                
+                if missing_fields:
+                    self.log_test("POST /api/search valid query", False, f"Result {i} missing fields: {missing_fields}")
+                    return False, None
+                
+                # Check field types
+                if not isinstance(result['content'], str):
+                    self.log_test("POST /api/search valid query", False, f"Result {i} content should be string, got {type(result['content'])}")
+                    return False, None
+                
+                if not isinstance(result['file'], str):
+                    self.log_test("POST /api/search valid query", False, f"Result {i} file should be string, got {type(result['file'])}")
+                    return False, None
+                
+                if not isinstance(result['relevance_score'], (int, float)):
+                    self.log_test("POST /api/search valid query", False, f"Result {i} relevance_score should be numeric, got {type(result['relevance_score'])}")
+                    return False, None
+            
+            details = f"Successfully retrieved {len(data)} results with proper structure"
+            self.log_test("POST /api/search valid query", True, details)
+            return True, data
+            
+        except Exception as e:
+            self.log_test("POST /api/search valid query", False, str(e))
+            return False, None
+
+    def test_search_max_results(self):
+        """Test POST /api/search returns max 5 results"""
+        print(f"\n🔍 Testing Search Max Results (5)...")
+        
+        try:
+            payload = {"query": "express application"}
+            response = requests.post(f"{self.base_url}/api/search", json=payload, timeout=30)
+            
+            if response.status_code != 200:
+                self.log_test("POST /api/search max 5 results", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/search max 5 results", False, "Response is not valid JSON")
+                return False
+            
+            if not isinstance(data, list):
+                self.log_test("POST /api/search max 5 results", False, f"Response should be array, got {type(data)}")
+                return False
+            
+            if len(data) > 5:
+                self.log_test("POST /api/search max 5 results", False, f"Expected max 5 results, got {len(data)}")
+                return False
+            
+            self.log_test("POST /api/search max 5 results", True, f"Correctly returned {len(data)} results (≤ 5)")
+            return True
+            
+        except Exception as e:
+            self.log_test("POST /api/search max 5 results", False, str(e))
+            return False
+
+    def test_search_relevance_threshold(self, search_data):
+        """Test that all search results have relevance_score >= 0.2"""
+        print(f"\n🔍 Testing Search Relevance Threshold (≥ 0.2)...")
+        
+        if not search_data:
+            self.log_test("Search relevance threshold", False, "No search data available (previous test failed)")
+            return False
+        
+        if len(search_data) == 0:
+            self.log_test("Search relevance threshold", True, "No results to check threshold")
+            return True
+        
+        # Check all scores are >= 0.2
+        low_scores = []
+        for i, result in enumerate(search_data):
+            score = result['relevance_score']
+            if score < 0.2:
+                low_scores.append(f"Result {i}: {score}")
+        
+        if low_scores:
+            details = f"Found results below 0.2 threshold: {low_scores}"
+            self.log_test("Search relevance threshold", False, details)
+            return False
+        else:
+            scores = [result['relevance_score'] for result in search_data]
+            details = f"All {len(search_data)} results above 0.2 threshold. Scores: {scores}"
+            self.log_test("Search relevance threshold", True, details)
+            return True
+
+    def test_retrieve_relevance_threshold(self):
+        """Test that POST /api/retrieve also respects the 0.2 threshold"""
+        print(f"\n🔍 Testing Retrieve Relevance Threshold (≥ 0.2)...")
+        
+        try:
+            payload = {"query": "express middleware routing"}
+            response = requests.post(f"{self.base_url}/api/retrieve", json=payload, timeout=30)
+            
+            if response.status_code != 200:
+                self.log_test("POST /api/retrieve threshold check", False, f"Status: {response.status_code}, Response: {response.text}")
+                return False
+            
+            try:
+                data = response.json()
+            except:
+                self.log_test("POST /api/retrieve threshold check", False, "Response is not valid JSON")
+                return False
+            
+            if 'results' not in data:
+                self.log_test("POST /api/retrieve threshold check", False, f"Missing results field: {data}")
+                return False
+            
+            results = data['results']
+            if len(results) == 0:
+                self.log_test("POST /api/retrieve threshold check", True, "No results to check threshold")
+                return True
+            
+            # Check all scores are >= 0.2
+            low_scores = []
+            for i, result in enumerate(results):
+                score = result['relevance_score']
+                if score < 0.2:
+                    low_scores.append(f"Result {i}: {score}")
+            
+            if low_scores:
+                details = f"Found retrieve results below 0.2 threshold: {low_scores}"
+                self.log_test("POST /api/retrieve threshold check", False, details)
+                return False
+            else:
+                scores = [result['relevance_score'] for result in results]
+                details = f"All {len(results)} retrieve results above 0.2 threshold. Scores: {scores}"
+                self.log_test("POST /api/retrieve threshold check", True, details)
+                return True
+            
+        except Exception as e:
+            self.log_test("POST /api/retrieve threshold check", False, str(e))
+            return False
+
     def run_all_tests(self):
-        """Run all tests for new features including chat endpoint"""
+        """Run all tests for new features including search endpoint"""
         print("=" * 70)
-        print("🚀 Starting Backend Tests for NEW FEATURES + CHAT ENDPOINT")
+        print("🚀 Starting Backend Tests for NEW FEATURES + SEARCH ENDPOINT")
         print(f"🌐 Testing URL: {self.base_url}")
         print("=" * 70)
         
@@ -709,7 +927,7 @@ class NewFeaturesTester:
             print("❌ Health endpoint failed - backend may be down")
             return False
         
-        # Test new info endpoint (should include /chat)
+        # Test new info endpoint (should include /search)
         self.test_info_endpoint()
         
         # Test error handling still works
@@ -720,12 +938,17 @@ class NewFeaturesTester:
         self.test_retrieve_missing_query()
         self.test_retrieve_before_ingestion()
         
+        # Test search endpoint error handling
+        print(f"\n🔧 Testing Search Endpoint Error Handling...")
+        self.test_search_missing_query()
+        self.test_search_before_ingestion()
+        
         # Test chat endpoint error handling
         print(f"\n🔧 Testing Chat Endpoint Error Handling...")
         self.test_chat_missing_question()
         self.test_chat_before_ingestion()
         
-        # Test main new functionality (embeddings + retrieval)
+        # Test main new functionality (embeddings + retrieval + search)
         print(f"\n🔧 Testing New Embedding & Retrieval Features...")
         success, ingest_data = self.test_ingest_repo_with_embeddings()
         
@@ -744,6 +967,20 @@ class NewFeaturesTester:
             # Test k parameter
             self.test_retrieve_with_k_parameter()
             
+            # Test retrieve respects threshold
+            self.test_retrieve_relevance_threshold()
+            
+            # Test search functionality after ingestion
+            print(f"\n🔧 Testing Search Endpoint After Ingestion...")
+            search_success, search_data = self.test_search_with_valid_query()
+            
+            if search_success:
+                # Test search relevance threshold
+                self.test_search_relevance_threshold(search_data)
+            
+            # Test search max results
+            self.test_search_max_results()
+            
             # Test full flow
             flow_success, flow_data = self.test_full_ingest_retrieve_flow()
             
@@ -759,7 +996,7 @@ class NewFeaturesTester:
                 self.test_chat_referenced_files_validity(chat_data)
             
         else:
-            print("⚠️  Skipping retrieval and chat tests due to ingest failure")
+            print("⚠️  Skipping retrieval, search and chat tests due to ingest failure")
         
         # Print summary
         print("\n" + "=" * 70)

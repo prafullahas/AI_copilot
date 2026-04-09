@@ -8,6 +8,7 @@ const repoRoutes = require('./routes/repo');
 const infoRoutes = require('./routes/info');
 const retrievalRoutes = require('./routes/retrieval');
 const chatRoutes = require('./routes/chat');
+const searchRoutes = require('./routes/search');
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -28,6 +29,7 @@ app.use('/api', repoRoutes);
 app.use('/api', infoRoutes);
 app.use('/api', retrievalRoutes);
 app.use('/api', chatRoutes);
+app.use('/api', searchRoutes);
 
 // 404 handler
 app.use((req, res) => {
