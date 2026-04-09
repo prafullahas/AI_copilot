@@ -17,6 +17,8 @@ Create a clean backend project using Node.js (Express) for an AI codebase copilo
 - Simple logger utility
 - POST /api/ingest-repo: clones GitHub repos (shallow), extracts .js/.ts/.py/.java files, ignores node_modules/dist/build, returns paths + content, auto-cleans temp dirs
 - utils/chunkCode.js: Language-aware code chunker — extracts functions and classes using brace-tracking (JS/TS/Java) and indentation-tracking (Python)
+- GET /api/info: Returns project name, version, available endpoints
+- services/embeddingService.js: Local embeddings via @xenova/transformers (Xenova/all-MiniLM-L6-v2, 384-dim) + FAISS (faiss-node) vector storage. Embeds chunks once at ingestion time. Includes search() for future query use.
 
 ## Prioritized Backlog
 - P0: AI logic integration (core copilot features)
