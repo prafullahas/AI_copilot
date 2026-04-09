@@ -24,6 +24,7 @@ Create a clean backend project using Node.js (Express) for an AI codebase copilo
 - services/llmService.js: Lazy-init OpenAI client, system prompt enforces context-only answers, 300 max_tokens, temperature 0
 - POST /api/search: Semantic code search (no LLM), reuses retrievalService, returns top 5 filtered chunks
 - Relevance threshold (0.2) in retrievalService — filters low-score results across both /search and /retrieve
+- JWT authentication: register (POST /api/auth/register), login (POST /api/auth/login), bcrypt password hashing, admin seeding, authMiddleware for route protection. Existing AI routes unchanged.
 
 ## Prioritized Backlog
 - P0: AI logic integration (core copilot features)
