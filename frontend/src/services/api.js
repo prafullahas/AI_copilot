@@ -32,6 +32,8 @@ export const authApi = {
 
 export const repoApi = {
   ingest: (repoUrl) => api.post('/ingest-repo', { repoUrl }),
+  switchRepo: (repoUrl) => api.post('/switch-repo', { repoUrl }),
+  listRepos: () => api.get('/repos'),
 };
 
 export const searchApi = {

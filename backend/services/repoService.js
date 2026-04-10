@@ -6,6 +6,7 @@ const logger = require('../utils/logger');
 
 const ALLOWED_EXTENSIONS = new Set(['.js', '.ts', '.py', '.java']);
 const IGNORED_DIRS = new Set(['node_modules', 'dist', 'build', '.git']);
+const MAX_FILE_SIZE = 500 * 1024; // 500KB per file
 
 const cloneRepo = (repoUrl) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-'));
@@ -30,6 +31,8 @@ const walkDir = (dir, baseDir, results = []) => {
       walkDir(fullPath, baseDir, results);
     } else if (ALLOWED_EXTENSIONS.has(path.extname(entry.name))) {
       const relativePath = path.relative(baseDir, fullPath);
+      const stat = fs.statSync(fullPath);
+      if (stat.size > MAX_FILE_SIZE) continue;
       const content = fs.readFileSync(fullPath, 'utf-8');
       results.push({ path: relativePath, content });
     }

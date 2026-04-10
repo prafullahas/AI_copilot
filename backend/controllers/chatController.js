@@ -1,10 +1,16 @@
 const retrievalService = require('../services/retrievalService');
 const llmService = require('../services/llmService');
 
+const MAX_QUESTION_LENGTH = 2000;
+
 const chat = async (req, res) => {
   const { question } = req.body;
   if (!question || typeof question !== 'string') {
     return res.status(400).json({ error: 'question is required' });
+  }
+
+  if (question.length > MAX_QUESTION_LENGTH) {
+    return res.status(400).json({ error: `Question too long (max ${MAX_QUESTION_LENGTH} chars)` });
   }
 
   try {

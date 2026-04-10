@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { repoApi } from '@/services/api';
 import RepoIngest from '@/components/RepoIngest';
 import ChatInterface from '@/components/ChatInterface';
 import SearchPanel from '@/components/SearchPanel';
-import { Terminal, LogOut, MessageSquare, Search, GitBranch, LayoutDashboard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Terminal, LogOut, MessageSquare, Search, GitBranch, LayoutDashboard, ChevronLeft, ChevronRight, ChevronDown, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
@@ -18,11 +19,38 @@ export default function DashboardPage() {
   const [activeView, setActiveView] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
   const [repoData, setRepoData] = useState(null);
+  const [repoHistory, setRepoHistory] = useState([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     navigate('/login');
   };
+
+  const handleIngested = useCallback((data) => {
+    setRepoData(data);
+    setRepoHistory((prev) => {
+      const filtered = prev.filter((r) => r.repo !== data.repo);
+      return [{ repo: data.repo, chunkCount: data.chunkCount, fileCount: data.fileCount, active: true }, ...filtered.map((r) => ({ ...r, active: false }))];
+    });
+  }, []);
+
+  const handleSwitch = useCallback(async (repoUrl) => {
+    if (repoUrl === repoData?.repo) { setDropdownOpen(false); return; }
+    setSwitching(true);
+    try {
+      const { data } = await repoApi.switchRepo(repoUrl);
+      const hist = repoHistory.find((r) => r.repo === repoUrl);
+      setRepoData({ repo: data.repo, chunkCount: data.totalEmbeddings, fileCount: hist?.fileCount || '?' });
+      setRepoHistory((prev) => prev.map((r) => ({ ...r, active: r.repo === repoUrl })));
+    } catch (err) {
+      console.error('Switch failed:', err);
+    } finally {
+      setSwitching(false);
+      setDropdownOpen(false);
+    }
+  }, [repoData, repoHistory]);
 
   return (
     <div className="h-screen bg-[#0A0A0A] flex overflow-hidden" data-testid="dashboard-page">
@@ -64,30 +92,66 @@ export default function DashboardPage() {
 
         {/* Collapse toggle + Logout */}
         <div className="px-2 pb-3 space-y-1">
-          {/* Repo status indicator */}
-          {repoData && (
-            <div
-              className={`mb-2 rounded-md border border-[#1A1A1A] bg-[#111111] transition-all duration-300 ${collapsed ? 'p-2' : 'px-3 py-2.5'}`}
-              data-testid="repo-status-indicator"
-            >
+          {/* Repo status indicator with dropdown */}
+          {repoHistory.length > 0 && (
+            <div className="mb-2 relative" data-testid="repo-status-indicator">
               {collapsed ? (
-                <div className="flex justify-center" title={repoData.repo}>
+                <div className="flex justify-center p-2 rounded-md border border-[#1A1A1A] bg-[#111111]" title={repoData?.repo}>
                   <GitBranch className="w-4 h-4 text-green-400" />
                 </div>
               ) : (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <GitBranch className="w-3.5 h-3.5 text-green-400 shrink-0" />
-                    <span className="text-[10px] uppercase tracking-[0.15em] text-[#525252] font-ibm">Loaded</span>
-                  </div>
-                  <p className="text-xs text-[#A3A3A3] font-mono truncate" title={repoData.repo}>
-                    {repoData.repo?.replace('https://github.com/', '')}
-                  </p>
-                  <div className="flex gap-3 text-[10px] text-[#525252] font-mono">
-                    <span>{repoData.fileCount} files</span>
-                    <span>{repoData.chunkCount} chunks</span>
-                  </div>
-                </div>
+                <>
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    data-testid="repo-switcher-button"
+                    className="w-full rounded-md border border-[#1A1A1A] bg-[#111111] px-3 py-2.5 text-left transition-all duration-200 hover:border-[#262626]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <GitBranch className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                        <span className="text-xs text-[#A3A3A3] font-mono truncate">
+                          {repoData?.repo?.replace('https://github.com/', '')}
+                        </span>
+                      </div>
+                      {switching ? (
+                        <Loader2 className="w-3 h-3 text-[#525252] animate-spin shrink-0" />
+                      ) : (
+                        <ChevronDown className={`w-3 h-3 text-[#525252] shrink-0 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                      )}
+                    </div>
+                    <div className="flex gap-3 text-[10px] text-[#525252] font-mono mt-1">
+                      <span>{repoData?.fileCount} files</span>
+                      <span>{repoData?.chunkCount} chunks</span>
+                    </div>
+                  </button>
+
+                  {dropdownOpen && repoHistory.length > 1 && (
+                    <div
+                      className="absolute bottom-full left-0 right-0 mb-1 bg-[#141414] border border-[#262626] rounded-md overflow-hidden shadow-lg z-50 animate-fade-in"
+                      data-testid="repo-switcher-dropdown"
+                    >
+                      <div className="px-3 py-2 border-b border-[#1A1A1A]">
+                        <span className="text-[10px] uppercase tracking-[0.15em] text-[#525252] font-ibm">Switch repository</span>
+                      </div>
+                      {repoHistory.map((r) => (
+                        <button
+                          key={r.repo}
+                          onClick={() => handleSwitch(r.repo)}
+                          data-testid={`repo-option-${r.repo.replace(/[^a-z0-9]/gi, '-')}`}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-mono transition-colors duration-150 ${
+                            r.active
+                              ? 'bg-[#1A1A1A] text-white'
+                              : 'text-[#737373] hover:bg-[#1A1A1A] hover:text-[#A3A3A3]'
+                          }`}
+                        >
+                          {r.active ? <Check className="w-3 h-3 text-green-400 shrink-0" /> : <div className="w-3 h-3 shrink-0" />}
+                          <span className="truncate">{r.repo.replace('https://github.com/', '')}</span>
+                          <span className="text-[10px] text-[#525252] ml-auto shrink-0">{r.chunkCount}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -123,7 +187,7 @@ export default function DashboardPage() {
             {/* Left: Repo + Search */}
             <div className="w-full lg:w-[440px] border-b lg:border-b-0 lg:border-r border-[#1A1A1A] flex flex-col shrink-0 overflow-hidden">
               <div className="p-5 border-b border-[#1A1A1A]">
-                <RepoIngest onIngested={setRepoData} />
+                <RepoIngest onIngested={handleIngested} />
               </div>
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <SearchPanel />

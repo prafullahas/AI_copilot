@@ -32,22 +32,28 @@ const generateAnswer = async (question, chunks) => {
     .map((c, i) => `--- File: ${c.file} ---\n${c.content}`)
     .join('\n\n');
 
-  const response = await getClient().chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: `Context:\n${context}\n\nQuestion: ${question}` },
-    ],
-    max_tokens: 300,
-    temperature: 0,
-  });
+  try {
+    const response = await getClient().chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Context:\n${context}\n\nQuestion: ${question}` },
+      ],
+      max_tokens: 300,
+      temperature: 0,
+      timeout: 30000,
+    });
 
-  const answer = response.choices[0].message.content.trim();
-  const referencedFiles = [...new Set(topChunks.map((c) => c.file))];
+    const answer = response.choices[0].message.content.trim();
+    const referencedFiles = [...new Set(topChunks.map((c) => c.file))];
 
-  logger.info(`LLM answer generated (${response.usage?.total_tokens || '?'} tokens)`);
+    logger.info(`LLM answer generated (${response.usage?.total_tokens || '?'} tokens)`);
 
-  return { answer, referencedFiles };
+    return { answer, referencedFiles };
+  } catch (err) {
+    logger.error(`LLM call failed: ${err.message}`);
+    throw new Error('Failed to generate answer. Please try again.');
+  }
 };
 
 module.exports = { generateAnswer };

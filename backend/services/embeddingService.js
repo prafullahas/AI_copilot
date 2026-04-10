@@ -1,18 +1,19 @@
 /**
  * embeddingService - TF-IDF vectorizer + cosine similarity search.
- *
- * Pure JS, zero native dependencies. Same API as the previous FAISS-based version.
- * Optimized for code search at repo scale (hundreds of chunks).
+ * Supports multiple repos stored in memory with one-click switching.
  */
 
 const logger = require('../utils/logger');
 
-let vocabulary = new Map(); // term -> index
-let idf = [];              // idf[termIndex] = IDF value
-let vectors = [];          // vectors[docIndex] = Float64Array (TF-IDF)
-let metadata = [];         // metadata[docIndex] = { filePath, type, content, preview }
+// Per-repo storage
+const repoStore = new Map(); // repoUrl -> { vocabulary, idf, vectors, metadata }
+let activeRepoUrl = null;
 
-// --- Tokenizer (code-aware) ---
+// Active working set
+let vocabulary = new Map();
+let idf = [];
+let vectors = [];
+let metadata = [];
 
 const tokenize = (text) => {
   return text
@@ -22,8 +23,6 @@ const tokenize = (text) => {
     .filter((t) => t.length > 1);
 };
 
-// --- Reset ---
-
 const resetIndex = () => {
   vocabulary = new Map();
   idf = [];
@@ -31,15 +30,11 @@ const resetIndex = () => {
   metadata = [];
 };
 
-// --- Build TF-IDF vectors for all chunks ---
-
-const embedAndStore = async (chunks) => {
+const embedAndStore = async (chunks, repoUrl) => {
   resetIndex();
 
-  // 1. Tokenize all docs
   const docs = chunks.map((c) => tokenize(c.content));
 
-  // 2. Build vocabulary + document frequency
   const df = new Map();
   for (const tokens of docs) {
     const seen = new Set(tokens);
@@ -48,10 +43,9 @@ const embedAndStore = async (chunks) => {
     }
   }
 
-  // 3. Assign indices and compute IDF
   let idx = 0;
   const n = docs.length;
-  for (const [term, freq] of df) {
+  for (const [term] of df) {
     vocabulary.set(term, idx);
     idx++;
   }
@@ -60,14 +54,12 @@ const embedAndStore = async (chunks) => {
     idf[vocabulary.get(term)] = Math.log((n + 1) / (freq + 1)) + 1;
   }
 
-  // 4. Build TF-IDF vector per doc and store metadata
   for (let i = 0; i < chunks.length; i++) {
     const tf = new Float64Array(vocabulary.size);
     for (const t of docs[i]) {
       const ti = vocabulary.get(t);
       if (ti !== undefined) tf[ti]++;
     }
-    // TF-IDF = tf * idf, then L2-normalize
     for (let j = 0; j < tf.length; j++) tf[j] *= idf[j];
     const norm = Math.sqrt(tf.reduce((s, v) => s + v * v, 0)) || 1;
     for (let j = 0; j < tf.length; j++) tf[j] /= norm;
@@ -81,12 +73,43 @@ const embedAndStore = async (chunks) => {
     });
   }
 
+  // Store this repo's data
+  if (repoUrl) {
+    repoStore.set(repoUrl, {
+      vocabulary: new Map(vocabulary),
+      idf: new Float64Array(idf),
+      vectors: [...vectors],
+      metadata: [...metadata],
+    });
+    activeRepoUrl = repoUrl;
+  }
+
   const dimension = vocabulary.size;
-  logger.info(`Stored ${metadata.length} vectors (${dimension}-dim TF-IDF)`);
+  logger.info(`Stored ${metadata.length} vectors (${dimension}-dim) for ${repoUrl || 'unknown'}`);
   return { totalEmbeddings: metadata.length, dimension };
 };
 
-// --- Vectorize a query ---
+const switchRepo = (repoUrl) => {
+  if (!repoStore.has(repoUrl)) {
+    throw new Error('Repository not found in store');
+  }
+  const data = repoStore.get(repoUrl);
+  vocabulary = new Map(data.vocabulary);
+  idf = new Float64Array(data.idf);
+  vectors = [...data.vectors];
+  metadata = [...data.metadata];
+  activeRepoUrl = repoUrl;
+  logger.info(`Switched to repo: ${repoUrl} (${metadata.length} vectors)`);
+  return { repo: repoUrl, totalEmbeddings: metadata.length };
+};
+
+const getStoredRepos = () => {
+  return [...repoStore.entries()].map(([url, data]) => ({
+    repo: url,
+    chunkCount: data.metadata.length,
+    active: url === activeRepoUrl,
+  }));
+};
 
 const embedQuery = (text) => {
   const tokens = tokenize(text);
@@ -100,15 +123,11 @@ const embedQuery = (text) => {
   return vec;
 };
 
-// --- Cosine similarity (dot product of L2-normalized vectors) ---
-
 const dot = (a, b) => {
   let s = 0;
   for (let i = 0; i < a.length; i++) s += a[i] * b[i];
   return s;
 };
-
-// --- Search ---
 
 const search = async (query, k = 5) => {
   if (vectors.length === 0) return [];
@@ -123,4 +142,4 @@ const search = async (query, k = 5) => {
   }));
 };
 
-module.exports = { embedAndStore, search, resetIndex };
+module.exports = { embedAndStore, search, resetIndex, switchRepo, getStoredRepos };
