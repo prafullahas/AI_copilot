@@ -32,3 +32,10 @@ Create a clean backend project using Node.js (Express) for an AI codebase copilo
 - P1: Authentication layer
 - P2: Additional routes (code analysis, suggestions)
 - P2: Rate limiting, request validation
+
+## Frontend (Apr 9, 2026)
+- React SPA: Login, Register, Dashboard pages
+- Dark theme (Swiss/High-Contrast), Outfit + IBM Plex Sans + JetBrains Mono fonts
+- Dashboard: Repo ingestion panel, semantic search panel, chat interface
+- JWT auth flow with localStorage, protected routes, auto-redirect
+- Responsive (desktop split layout, mobile tabs)
