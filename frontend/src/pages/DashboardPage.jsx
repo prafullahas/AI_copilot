@@ -64,6 +64,34 @@ export default function DashboardPage() {
 
         {/* Collapse toggle + Logout */}
         <div className="px-2 pb-3 space-y-1">
+          {/* Repo status indicator */}
+          {repoData && (
+            <div
+              className={`mb-2 rounded-md border border-[#1A1A1A] bg-[#111111] transition-all duration-300 ${collapsed ? 'p-2' : 'px-3 py-2.5'}`}
+              data-testid="repo-status-indicator"
+            >
+              {collapsed ? (
+                <div className="flex justify-center" title={repoData.repo}>
+                  <GitBranch className="w-4 h-4 text-green-400" />
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                    <span className="text-[10px] uppercase tracking-[0.15em] text-[#525252] font-ibm">Loaded</span>
+                  </div>
+                  <p className="text-xs text-[#A3A3A3] font-mono truncate" title={repoData.repo}>
+                    {repoData.repo?.replace('https://github.com/', '')}
+                  </p>
+                  <div className="flex gap-3 text-[10px] text-[#525252] font-mono">
+                    <span>{repoData.fileCount} files</span>
+                    <span>{repoData.chunkCount} chunks</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <Separator className="bg-[#1A1A1A] mb-2" />
           <button
             onClick={() => setCollapsed(!collapsed)}
