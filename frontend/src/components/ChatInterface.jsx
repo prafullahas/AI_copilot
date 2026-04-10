@@ -156,7 +156,7 @@ export default function ChatInterface() {
       </ScrollArea>
 
       {/* Input */}
-      <div className="px-5 py-4 border-t border-[#1A1A1A] shrink-0">
+      <div className="px-5 py-4 pb-6 border-t border-[#1A1A1A] shrink-0 relative z-50">
         <form onSubmit={handleSend} className="flex gap-3" data-testid="chat-input-form">
           <Input
             ref={inputRef}
@@ -171,7 +171,7 @@ export default function ChatInterface() {
             type="submit"
             disabled={loading || !input.trim()}
             data-testid="chat-send-button"
-            className="h-11 w-11 p-0 bg-blue-600 hover:bg-blue-500 disabled:bg-[#1A1A1A] disabled:text-[#3A3A3A] text-white rounded-lg transition-all duration-200"
+            className="h-11 w-11 p-0 bg-blue-600 hover:bg-blue-500 disabled:bg-[#1A1A1A] disabled:text-[#3A3A3A] text-white rounded-lg transition-all duration-200 relative z-50"
           >
             <Send className="w-4 h-4" />
           </Button>
