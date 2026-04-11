@@ -10,8 +10,8 @@ let client = null;
 const getClient = () => {
   if (!client) {
     client = new OpenAI({
-      apiKey: process.env.EMERGENT_LLM_KEY,
-      baseURL: process.env.INTEGRATION_PROXY_URL + '/llm',
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
       defaultHeaders: { 'X-App-ID': process.env.APP_URL },
     });
   }
