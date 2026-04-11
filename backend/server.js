@@ -47,11 +47,13 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', async () => {
   logger.info(`Server running on http://0.0.0.0:${PORT}`);
-  try {
-    await seedAdmin();
-  } catch (err) {
-    logger.error(`Admin seed failed: ${err.message}`);
-  }
+
+  // Admin seed disabled for production stability
+  // try {
+  //   await seedAdmin();
+  // } catch (err) {
+  //   logger.error(`Admin seed failed: ${err.message}`);
+  // }
 });
 
 module.exports = app;
